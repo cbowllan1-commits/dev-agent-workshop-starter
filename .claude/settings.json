@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "command": "file=\"$CLAUDE_FILE\"; if [[ \"$file\" == *.py ]]; then uv run ruff format \"$file\" 2>/dev/null; uv run ruff check --fix \"$file\" 2>/dev/null; fi",
+        "timeout": 10000
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(uv sync *)",
+      "Bash(pnpm *)",
+      "Bash(git *)"
+    ]
+  }
+}
