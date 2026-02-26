@@ -60,47 +60,57 @@ It can read but NOT edit. Look at the agent file to see how tools and model are 
 
 ## Exercise 3: Build a `/check-ui` Skill
 
-The `.claude/skills/` directory is intentionally empty. You're going to build your first skill.
+The `.claude/skills/` directory is intentionally empty. You're going to build your first skill — one that actually looks at the running UI and tells you what it sees.
 
-### Step 1: Create the helper script
+### Step 1: Create the skill
 
-```
-Create a scripts/check-api.sh that:
-- Calls GET /api/health and prints the result
-- Calls GET /api/stats and prints the result
-- Calls GET /api/products and prints the first 8 products with name, category, stock, and status
-- Make it executable
-```
-
-Verify it works:
-
-```bash
-./scripts/check-api.sh
-```
-
-### Step 2: Create the skill
+Ask Claude to build it:
 
 ```
 Create .claude/skills/check-ui/SKILL.md with:
 - name: check-ui
-- description: "Verify the inventory app UI state by checking API responses"
+- description: "Verify the inventory app UI by checking what's actually rendered in the browser"
 - disable-model-invocation: true
-- Dynamic context injection: !`./scripts/check-api.sh 2>&1`
-- Instructions: interpret the injected data and report health status,
-  inventory counts, and a one-line verdict
+- Dynamic context injection using !`./scripts/check-api.sh 2>&1` to pull
+  in the API state as background data
+- Instructions that tell Claude to:
+  1. Read the injected API data to understand what the backend thinks the state is
+  2. Use agent-browser to open the frontend (http://localhost:5173), take a
+     snapshot of interactive elements, and take a screenshot
+  3. Compare what the UI shows vs what the API returned — do the stats match?
+     Are the right number of products in the table? Are status badges showing
+     the correct colors?
+  4. Save the screenshot to /tmp/check-ui.png
+  5. Report: what the API says, what the UI shows, whether they match, and
+     a one-line verdict
+  6. Close the browser when done
 ```
 
-### Step 3: Test it
+### Step 2: Baseline check
+
+Make sure the app is running (backend on :8000, frontend on :5173), then:
 
 ```
 /check-ui
 ```
 
-You should see a report like: "28 products, 17 in stock, 7 low stock, 4 out of stock."
+Claude will:
+1. Inject the API data (28 products, 17/7/4 split) via the `!` preprocessor
+2. Open the browser, snapshot the page, take a screenshot
+3. Compare the rendered stats bar and table against the API data
+4. Report that everything matches
 
-### Step 4: Make a change and verify
+You should see something like: "API reports 28 products. UI shows 28 rows with stats bar showing 28/17/7/4. Screenshot saved. Everything matches."
 
-In a separate terminal, create a new product via curl:
+**Two things happened here:**
+- The `!` backtick ran `check-api.sh` *before* Claude saw the prompt (preprocessing)
+- Claude *decided* to use agent-browser to visually verify (tool use)
+
+That's the difference: `!` commands run unconditionally. Tool calls are Claude's choice, guided by your instructions.
+
+### Step 3: Make a change, check again
+
+In a separate terminal, create a new out-of-stock product:
 
 ```bash
 curl -s -X POST http://localhost:8000/api/products \
@@ -108,20 +118,20 @@ curl -s -X POST http://localhost:8000/api/products \
   -d '{"name":"Workshop Badge","category":"Accessories","price":4.99,"stock":0,"sku":"WS-001"}'
 ```
 
-Back in your Claude session:
+Back in Claude:
 
 ```
 /check-ui
 ```
 
-Now it should report **29 products** and **5 out of stock**. The curl call changed the data, and your skill detected it.
+Now the API data shows **29 products** and **5 out of stock**. Claude opens the browser, refreshes the page, and should confirm the UI matches — a new row appeared in the table and the stats bar updated.
 
-### Step 5: Change a status color
+### Step 4: Change a status color
 
-Patch the product's stock to trigger a status change (Out of Stock → Low Stock):
+Patch the product's stock to trigger a visible status change:
 
 ```bash
-# Replace <ID> with the id from the POST response
+# Replace <ID> with the id from the POST response above
 curl -s -X PATCH http://localhost:8000/api/products/<ID> \
   -H "Content-Type: application/json" \
   -d '{"stock": 5}'
@@ -131,9 +141,16 @@ curl -s -X PATCH http://localhost:8000/api/products/<ID> \
 /check-ui
 ```
 
-Now: 29 products, **8 low stock**, **4 out of stock**. The status flipped from red to yellow.
+The API now reports **8 low stock** and **4 out of stock**. In the browser, the "Workshop Badge" row's status badge should have flipped from red ("Out of Stock") to yellow ("Low Stock"). Claude confirms the color change is visible in the UI.
 
-**What you just learned**: Skills with `!` backtick syntax inject live data before Claude sees the prompt. The skill is a reusable verification step — make a change, run `/check-ui`, see the result.
+### What you just learned
+
+| Concept | How it showed up |
+|---------|-----------------|
+| **Dynamic injection** (`!` backtick) | API data was injected before Claude ran — it never decided to call curl |
+| **Tool use** (agent-browser) | Claude decided to open the browser, snapshot, and screenshot based on your instructions |
+| **`disable-model-invocation: true`** | This skill only runs when YOU type `/check-ui` — it won't fire automatically |
+| **Verification loop** | Make a change → `/check-ui` → see the result. Reusable, consistent, shareable via git |
 
 ---
 
