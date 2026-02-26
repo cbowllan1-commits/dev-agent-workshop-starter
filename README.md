@@ -47,9 +47,16 @@ Backend runs on http://localhost:8000, frontend on http://localhost:5173.
 └── setup.sh                # One-command setup
 ```
 
-## Workshop Usage
+## Workshop Exercises
 
-This repo is designed for the [Claude Code LA Meetup](https://lu.ma/claude-code-la). Clone it, then follow the table walkthrough exercises.
+**[See WORKSHOP.md for the full hands-on guide.](WORKSHOP.md)**
+
+The exercises walk you through:
+1. Exploring the codebase with subagents
+2. Using the pre-built code-reviewer agent
+3. Building a `/check-ui` skill from scratch — make API changes and verify them
+4. Seeing auto-formatting hooks in action
+5. Building your own agents and skills
 
 Start Claude Code in this directory:
 
@@ -57,7 +64,7 @@ Start Claude Code in this directory:
 claude
 ```
 
-Claude will read CLAUDE.md and understand the project. The `.claude/skills/` directory is intentionally empty — building skills is part of the workshop.
+Claude reads CLAUDE.md and understands the project. The `.claude/skills/` directory is intentionally empty — building skills is the exercise.
 
 ## License
 
