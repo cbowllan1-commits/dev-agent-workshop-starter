@@ -1,14 +1,19 @@
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.database import Database
 from src.models import Category, Product, ProductCreate, ProductUpdate, StatsResponse, Status
 
 app = FastAPI(title="Product Inventory Tracker", version="0.1.0")
 
+_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,3 +74,12 @@ def delete_product(product_id: str) -> None:
 def get_stats() -> StatsResponse:
     db = get_db()
     return StatsResponse(**db.get_stats())
+
+
+_dist_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.isdir(_dist_dir):
+    app.mount("/assets", StaticFiles(directory=os.path.join(_dist_dir, "assets")), name="assets")
+
+    @app.get("/{full_path:path}")
+    def serve_spa(full_path: str) -> FileResponse:
+        return FileResponse(os.path.join(_dist_dir, "index.html"))
